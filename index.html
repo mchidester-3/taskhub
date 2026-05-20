@@ -109,8 +109,8 @@
   #install-banner .close-banner{background:none;border:none;color:var(--text3);cursor:pointer;padding:0;font-size:18px;margin-left:auto;line-height:1;}
   .new-customer-box{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;}
   .new-customer-box input{flex:1;min-width:150px;}
-  .new-customer-box .save-cust-btn{background:var(--green);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
-  .new-customer-box .cancel-cust-btn{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;font-family:inherit;cursor:pointer;font-size:13px;}
+  .save-cust-btn{background:var(--green);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
+  .cancel-cust-btn{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;font-family:inherit;cursor:pointer;font-size:13px;}
   @media(max-width:600px){
     .stats-row{grid-template-columns:repeat(2,1fr);}
     .stat-value{font-size:24px;}
@@ -153,15 +153,11 @@ const DEFAULT_CUSTOMERS=[
 
 function loadData(){
   try{tasks=JSON.parse(localStorage.getItem('taskhub-tasks')||'[]');}catch{tasks=[];}
-  try{
-    const saved=JSON.parse(localStorage.getItem('taskhub-customers')||'null');
-    customers=(saved&&saved.length>0)?saved:[...DEFAULT_CUSTOMERS];
-  }catch{customers=[...DEFAULT_CUSTOMERS];}
+  try{const s=JSON.parse(localStorage.getItem('taskhub-customers')||'null');customers=(s&&s.length>0)?s:[...DEFAULT_CUSTOMERS];}
+  catch{customers=[...DEFAULT_CUSTOMERS];}
   saveCustomers();
 }
-
 function saveCustomers(){localStorage.setItem('taskhub-customers',JSON.stringify(customers));}
-
 let saveTimer;
 function saveData(){
   document.getElementById('saving-badge').style.display='block';
@@ -189,10 +185,10 @@ function render(){
   else if(view==='new')m.innerHTML=renderNewTask();
 }
 
-function custSelectHtml(sel,onch,cid){
+function custSelectHtml(sel,cid){
   const opts=customers.map(c=>`<option value="${escHtml(c)}"${sel===c?' selected':''}>${escHtml(c)}</option>`).join('');
   return`<div id="${cid}">
-    <select class="customer-select" onchange="${onch}(this,'${cid}')">
+    <select class="customer-select" onchange="onCustChange(this,'${cid}')">
       <option value="">-- Select Customer --</option>${opts}
       <option value="__new__">+ Add New Customer…</option>
     </select>
@@ -205,9 +201,14 @@ function custSelectHtml(sel,onch,cid){
 }
 
 function onCustChange(sel,cid){
-  if(sel.value==='__new__'){sel.value='';document.getElementById(cid+'-nb').style.display='flex';setTimeout(()=>document.getElementById(cid+'-ni').focus(),50);}
-  else if(view==='task'){updateField('customer',sel.value);}
-  else if(view==='new'){newDraft.customer=sel.value;}
+  if(sel.value==='__new__'){
+    sel.value='';
+    document.getElementById(cid+'-nb').style.display='flex';
+    setTimeout(()=>document.getElementById(cid+'-ni').focus(),50);
+  } else {
+    if(view==='task') updateField('customer',sel.value);
+    else if(view==='new') newDraft.customer=sel.value;
+  }
 }
 
 function saveNewCust(cid){
@@ -215,8 +216,8 @@ function saveNewCust(cid){
   const name=inp.value.trim().toUpperCase();
   if(!name)return;
   if(!customers.includes(name)){customers.push(name);customers.sort();saveCustomers();}
-  if(view==='task'){updateField('customer',name);}
-  else if(view==='new'){newDraft.customer=name;}
+  if(view==='task') updateField('customer',name);
+  else if(view==='new') newDraft.customer=name;
   render();
 }
 
@@ -274,7 +275,7 @@ function renderTaskPage(t){
           </div>
           <div style="margin-top:14px;">
             <label class="field-label">Customer</label>
-            ${custSelectHtml(t.customer||'','onCustChange','tc-cust')}
+            ${custSelectHtml(t.customer||'','tc-cust')}
           </div>
         </div>
         <button class="delete-btn" onclick="document.getElementById('confirm-delete').style.display='flex'">🗑️</button>
@@ -345,44 +346,67 @@ function renderNewTask(){
   const DT=['Bid Due Date','Submittal Drawings','Production','Ship Date','Delivery','Progress Payment'];
   const sh=steps.map((s,i)=>{const c=i<newStep?'done':i===newStep?'active':'future';return`<div class="step-dot ${c}">${i<newStep?'✓':i+1}</div><span class="step-label${i===newStep?' active':''}">${s}</span>${i<steps.length-1?'<span class="step-sep">›</span>':''}`;}).join('');
   let ct='';
-  if(newStep===0){ct=`
-    <div class="field" style="margin-bottom:16px;"><label class="field-label">Task Name *</label><input class="input" value="${escHtml(newDraft.name)}" placeholder="Enter task name…" oninput="newDraft.name=this.value" style="font-size:18px;padding:12px 14px;"/></div>
-    <div class="field" style="margin-bottom:16px;"><label class="field-label">Customer</label>${custSelectHtml(newDraft.customer||'','onCustChange','nc-cust')}</div>
-    <div class="field" style="margin-bottom:16px;"><label class="field-label">Initial Status</label><select class="status-select" onchange="newDraft.status=this.value">${Object.keys(SC).map(s=>`<option${newDraft.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="field"><label class="field-label">Notes</label><textarea class="input" rows="4" placeholder="Add any initial notes…" oninput="newDraft.notes=this.value">${escHtml(newDraft.notes||'')}</textarea></div>`;}
-  else if(newStep===1){ct=`<datalist id="dt">${DT.map(d=>`<option value="${d}"/>`).join('')}</datalist>
-    <div class="section-hdr"><span>Add Due Dates</span><button class="small-add-btn" onclick="newDraft.dueDates.push({id:uid(),label:'',date:'',notes:''});render()">+ Add Date</button></div>
-    <p style="color:var(--text3);font-size:13px;margin-bottom:14px;">Name each milestone whatever you need.</p>
-    ${newDraft.dueDates.length===0?'<div class="empty-section">Tap "Add Date" to add your first milestone</div>':''}
-    ${newDraft.dueDates.map((d,i)=>`<div class="card"><div class="card-hdr"><span>📅</span><span class="card-hdr-title">${escHtml(d.label||`Milestone ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.dueDates=newDraft.dueDates.filter(x=>x.id!=='${d.id}');render()">🗑</button></div>
-    <div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(d.label||'')}" list="dt" placeholder="e.g. Bid Due Date…" oninput="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,label:this.value}:x)"/></div>
-    <div class="field"><label class="field-label">Date</label><input class="input" type="date" value="${d.date||''}" onchange="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,date:this.value}:x)"/></div></div></div></div>`).join('')}`;}
-  else if(newStep===2){ct=`<div class="section-hdr"><span>Set Reminders</span><button class="small-add-btn" onclick="newDraft.reminders.push({id:uid(),label:'',datetime:'',method:'email',contact:''});render()">+ Add Reminder</button></div>
-    <div class="reminder-notice">🔔 <span>Set date, time, and contact for each reminder.</span></div>
-    ${newDraft.reminders.length===0?'<div class="empty-section">Tap "Add Reminder" to create a reminder</div>':''}
-    ${newDraft.reminders.map((r,i)=>`<div class="card"><div class="card-hdr"><span>🔔</span><span class="card-hdr-title">${escHtml(r.label||`Reminder ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.reminders=newDraft.reminders.filter(x=>x.id!=='${r.id}');render()">🗑</button></div>
-    <div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(r.label||'')}" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,label:this.value}:x)"/></div>
-    <div class="field"><label class="field-label">Date & Time</label><input class="input" type="datetime-local" value="${r.datetime||''}" onchange="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,datetime:this.value}:x)"/></div></div>
-    <div class="field-row"><div class="field"><label class="field-label">Method</label><div class="method-btns">
-    <button class="method-btn${r.method==='email'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'email'}:x);render()">📧 EMAIL</button>
-    <button class="method-btn${r.method==='sms'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'sms'}:x);render()">💬 SMS</button>
-    </div></div><div class="field"><label class="field-label">${r.method==='email'?'Email':'Phone'}</label>
-    <input class="input" value="${escHtml(r.contact||'')}" placeholder="${r.method==='email'?'you@example.com':'+1 (555) 000-0000'}" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,contact:this.value}:x)"/></div></div></div></div>`).join('')}`;}
-  else{ct=`<div class="review-box"><div class="review-title">📋 Task Summary</div>
-    <div class="review-row"><span>Name:</span><strong>${escHtml(newDraft.name||'—')}</strong></div>
-    <div class="review-row"><span>Customer:</span><strong>${escHtml(newDraft.customer||'—')}</strong></div>
-    <div class="review-row"><span>Status:</span><strong>${newDraft.status}</strong></div>
-    <div class="review-row"><span>Due Dates:</span><strong>${newDraft.dueDates.length} milestone${newDraft.dueDates.length!==1?'s':''}</strong></div>
-    <div class="review-row"><span>Reminders:</span><strong>${newDraft.reminders.length} reminder${newDraft.reminders.length!==1?'s':''}</strong></div>
-    ${newDraft.dueDates.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">MILESTONES</div>${newDraft.dueDates.map(d=>`<div class="review-item">📅 <strong>${escHtml(d.label||'Unnamed')}</strong> — ${d.date?fmt(d.date):'No date set'}</div>`).join('')}</div>`:''}
-    ${newDraft.reminders.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">REMINDERS</div>${newDraft.reminders.map(r=>`<div class="review-item">🔔 <strong>${escHtml(r.label||'Unnamed')}</strong> — ${r.datetime?fmtDT(r.datetime):'No time set'} via ${r.method.toUpperCase()}</div>`).join('')}</div>`:''}
-    </div>`;}
+  if(newStep===0){
+    ct=`
+      <div class="field" style="margin-bottom:16px;">
+        <label class="field-label">Task Name *</label>
+        <input class="input" id="new-name" value="${escHtml(newDraft.name)}" placeholder="Enter task name…" oninput="newDraft.name=this.value;document.getElementById('name-err').style.display='none';" style="font-size:18px;padding:12px 14px;"/>
+        <div id="name-err" style="display:none;color:var(--red);font-size:12px;margin-top:5px;">⚠️ Please enter a task name to continue.</div>
+      </div>
+      <div class="field" style="margin-bottom:16px;">
+        <label class="field-label">Customer</label>
+        ${custSelectHtml(newDraft.customer||'','nc-cust')}
+      </div>
+      <div class="field" style="margin-bottom:16px;">
+        <label class="field-label">Initial Status</label>
+        <select class="status-select" onchange="newDraft.status=this.value">${Object.keys(SC).map(s=>`<option${newDraft.status===s?' selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="field">
+        <label class="field-label">Notes</label>
+        <textarea class="input" rows="4" placeholder="Add any initial notes…" oninput="newDraft.notes=this.value">${escHtml(newDraft.notes||'')}</textarea>
+      </div>`;
+  } else if(newStep===1){
+    ct=`<datalist id="dt">${DT.map(d=>`<option value="${d}"/>`).join('')}</datalist>
+      <div class="section-hdr"><span>Add Due Dates</span><button class="small-add-btn" onclick="newDraft.dueDates.push({id:uid(),label:'',date:'',notes:''});render()">+ Add Date</button></div>
+      <p style="color:var(--text3);font-size:13px;margin-bottom:14px;">Name each milestone whatever you need.</p>
+      ${newDraft.dueDates.length===0?'<div class="empty-section">Tap "Add Date" to add your first milestone</div>':''}
+      ${newDraft.dueDates.map((d,i)=>`<div class="card"><div class="card-hdr"><span>📅</span><span class="card-hdr-title">${escHtml(d.label||`Milestone ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.dueDates=newDraft.dueDates.filter(x=>x.id!=='${d.id}');render()">🗑</button></div>
+      <div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(d.label||'')}" list="dt" placeholder="e.g. Bid Due Date…" oninput="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,label:this.value}:x)"/></div>
+      <div class="field"><label class="field-label">Date</label><input class="input" type="date" value="${d.date||''}" onchange="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,date:this.value}:x)"/></div></div></div></div>`).join('')}`;
+  } else if(newStep===2){
+    ct=`<div class="section-hdr"><span>Set Reminders</span><button class="small-add-btn" onclick="newDraft.reminders.push({id:uid(),label:'',datetime:'',method:'email',contact:''});render()">+ Add Reminder</button></div>
+      <div class="reminder-notice">🔔 <span>Set date, time, and contact for each reminder.</span></div>
+      ${newDraft.reminders.length===0?'<div class="empty-section">Tap "Add Reminder" to create a reminder</div>':''}
+      ${newDraft.reminders.map((r,i)=>`<div class="card"><div class="card-hdr"><span>🔔</span><span class="card-hdr-title">${escHtml(r.label||`Reminder ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.reminders=newDraft.reminders.filter(x=>x.id!=='${r.id}');render()">🗑</button></div>
+      <div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(r.label||'')}" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,label:this.value}:x)"/></div>
+      <div class="field"><label class="field-label">Date & Time</label><input class="input" type="datetime-local" value="${r.datetime||''}" onchange="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,datetime:this.value}:x)"/></div></div>
+      <div class="field-row"><div class="field"><label class="field-label">Method</label><div class="method-btns">
+      <button class="method-btn${r.method==='email'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'email'}:x);render()">📧 EMAIL</button>
+      <button class="method-btn${r.method==='sms'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'sms'}:x);render()">💬 SMS</button>
+      </div></div><div class="field"><label class="field-label">${r.method==='email'?'Email':'Phone'}</label>
+      <input class="input" value="${escHtml(r.contact||'')}" placeholder="${r.method==='email'?'you@example.com':'+1 (555) 000-0000'}" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,contact:this.value}:x)"/></div></div></div></div>`).join('')}`;
+  } else {
+    ct=`<div class="review-box"><div class="review-title">📋 Task Summary</div>
+      <div class="review-row"><span>Name:</span><strong>${escHtml(newDraft.name||'—')}</strong></div>
+      <div class="review-row"><span>Customer:</span><strong>${escHtml(newDraft.customer||'—')}</strong></div>
+      <div class="review-row"><span>Status:</span><strong>${newDraft.status}</strong></div>
+      <div class="review-row"><span>Due Dates:</span><strong>${newDraft.dueDates.length} milestone${newDraft.dueDates.length!==1?'s':''}</strong></div>
+      <div class="review-row"><span>Reminders:</span><strong>${newDraft.reminders.length} reminder${newDraft.reminders.length!==1?'s':''}</strong></div>
+      ${newDraft.dueDates.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">MILESTONES</div>${newDraft.dueDates.map(d=>`<div class="review-item">📅 <strong>${escHtml(d.label||'Unnamed')}</strong> — ${d.date?fmt(d.date):'No date set'}</div>`).join('')}</div>`:''}
+      ${newDraft.reminders.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">REMINDERS</div>${newDraft.reminders.map(r=>`<div class="review-item">🔔 <strong>${escHtml(r.label||'Unnamed')}</strong> — ${r.datetime?fmtDT(r.datetime):'No time set'} via ${r.method.toUpperCase()}</div>`).join('')}</div>`:''}
+    </div>`;
+  }
   return`<div class="page"><div class="new-task-hdr"><div class="new-task-title">Create New Task</div><div class="step-indicator">${sh}</div></div>
   <div class="tab-content">${ct}</div>
-  <div class="step-nav"><button class="cancel-btn" onclick="newDraft=null;newStep=0;goHome()">Cancel</button>
-  <div style="display:flex;gap:10px;">${newStep>0?`<button class="prev-btn" onclick="newStep--;render()">← Back</button>`:''}
-  ${newStep<steps.length-1?`<button class="add-btn" onclick="if(newDraft.name.trim())newStep++;render()" ${!newDraft.name.trim()?'disabled style="opacity:0.5"':''}>Next →</button>`:`<button class="add-btn" onclick="saveNewTask()" ${!newDraft.name.trim()?'disabled style="opacity:0.5"':''}>✓ Save Task</button>`}
-  </div></div></div>`;
+  <div class="step-nav">
+    <button class="cancel-btn" onclick="newDraft=null;newStep=0;goHome()">Cancel</button>
+    <div style="display:flex;gap:10px;">
+      ${newStep>0?`<button class="prev-btn" onclick="newStep--;render()">← Back</button>`:''}
+      ${newStep<steps.length-1
+        ?`<button class="add-btn" onclick="if(newDraft.name.trim()){newStep++;render();}else{document.getElementById('name-err').style.display='block';}" style="${!newDraft.name.trim()?'opacity:0.6':''}">Next →</button>`
+        :`<button class="add-btn" onclick="saveNewTask()" style="${!newDraft.name.trim()?'opacity:0.6':''}">✓ Save Task</button>`}
+    </div>
+  </div></div>`;
 }
 
 function toggleCard(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
