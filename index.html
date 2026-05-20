@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>TaskHub</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TaskHub"/>
+<meta name="theme-color" content="#080f1a"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='38' fill='%23080f1a'/%3E%3Ctext x='90' y='120' font-size='90' text-anchor='middle' fill='%23818cf8'%3E⬡%3C/text%3E%3C/svg%3E"/>
+<link rel="manifest" href="manifest.json"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  :root{
+    --bg:#080f1a;--surface:#0d1726;--surface2:#1e293b;--border:#1e293b;--border2:#334155;
+    --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--accent:#818cf8;--accent2:#a5b4fc;
+    --green:#10b981;--amber:#f59e0b;--red:#ef4444;--mono:'DM Mono',monospace;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans','Segoe UI',sans-serif;font-size:16px;overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100%;height:100dvh;}
+  #header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-shrink:0;padding-top:env(safe-area-inset-top);}
+  .logo{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:2px;color:var(--accent);}
+  #breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text3);margin-left:16px;}
+  #breadcrumb span.current{color:var(--text);}
+  #saving-badge{background:var(--surface2);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);font-family:var(--mono);display:none;}
+  #main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom);}
+  .page{max-width:900px;margin:0 auto;padding:24px 16px;}
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+  .stat-value{font-size:30px;font-weight:800;font-family:var(--mono);line-height:1;}
+  .stat-label{font-size:11px;color:var(--text3);margin-top:6px;text-transform:uppercase;letter-spacing:1px;}
+  .controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+  .search-input{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 14px;font-size:14px;outline:none;font-family:inherit;}
+  .filter-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .filter-btn{background:none;border:1px solid var(--border);color:var(--text3);border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .filter-btn.active{background:var(--accent);color:#0f172a;border-color:var(--accent);font-weight:700;}
+  .add-btn{display:flex;align-items:center;gap:6px;background:var(--accent);color:#0f172a;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;font-family:inherit;}
+  .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+  .task-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;display:flex;flex-direction:column;gap:10px;transition:border-color 0.15s;}
+  .task-card:hover{border-color:var(--accent);}
+  .tc-top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;}
+  .tc-name{font-size:15px;font-weight:700;color:#f1f5f9;flex:1;line-height:1.3;}
+  .status-badge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;letter-spacing:0.5px;}
+  .tc-due{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);}
+  .tc-due.overdue{color:var(--red);}
+  .tc-due.soon{color:var(--amber);}
+  .overdue-tag{background:#ef444422;color:var(--red);border:1px solid #ef444444;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;}
+  .soon-tag{background:#f59e0b22;color:var(--amber);border:1px solid #f59e0b44;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;}
+  .tc-meta{display:flex;align-items:center;gap:12px;color:var(--text3);font-size:12px;border-top:1px solid var(--border);padding-top:10px;margin-top:2px;}
+  .tc-meta-item{display:flex;align-items:center;gap:4px;}
+  .tc-date{margin-left:auto;font-size:11px;}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text2);}
+  .empty-icon{font-size:48px;margin-bottom:12px;}
+  .empty-title{font-size:18px;font-weight:600;margin-bottom:8px;}
+  .empty-sub{color:var(--text3);margin-bottom:24px;font-size:14px;}
+  .task-header{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+  .task-name-input{background:none;border:none;color:#f1f5f9;font-size:24px;font-weight:800;width:100%;outline:none;font-family:inherit;line-height:1.2;}
+  .task-meta-row{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;}
+  .field-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px;}
+  .status-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:8px;font-size:13px;outline:none;cursor:pointer;font-family:inherit;}
+  .delete-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--red);font-size:18px;flex-shrink:0;}
+  .confirm-box{background:#1e0d0d;border:1px solid var(--red);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:14px;}
+  .confirm-yes{background:var(--red);color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-weight:600;font-family:inherit;}
+  .confirm-no{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);border-radius:6px;padding:7px 16px;cursor:pointer;font-family:inherit;}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab{display:flex;align-items:center;gap:6px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);padding:10px 14px;font-size:13px;cursor:pointer;white-space:nowrap;font-family:inherit;margin-bottom:-1px;}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-content{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;min-height:280px;}
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;}
+  .field-row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .input{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);padding:9px 12px;font-size:14px;outline:none;width:100%;font-family:inherit;}
+  .input:focus{border-color:var(--accent);}
+  textarea.input{resize:vertical;line-height:1.6;}
+  .section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-size:15px;font-weight:700;}
+  .small-add-btn{display:flex;align-items:center;gap:5px;background:var(--accent);color:#0f172a;border:none;border-radius:6px;padding:6px 12px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;}
+  .empty-section{color:var(--text3);font-size:14px;text-align:center;padding:36px 16px;border:1px dashed var(--border2);border-radius:10px;}
+  .card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+  .card-hdr{display:flex;align-items:center;padding:12px 14px;gap:8px;cursor:pointer;}
+  .card-hdr-title{font-weight:600;font-size:14px;flex:1;}
+  .card-hdr-sub{color:var(--text3);font-size:12px;}
+  .card-body{padding:14px;border-top:1px solid var(--border2);}
+  .icon-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;display:flex;align-items:center;border-radius:4px;font-size:16px;}
+  .days-badge{font-size:11px;padding:2px 7px;border-radius:10px;}
+  .reminder-notice{display:flex;align-items:center;gap:8px;background:#818cf808;border:1px solid #818cf822;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);}
+  .method-btns{display:flex;gap:8px;}
+  .method-btn{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border2);color:var(--text3);border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .method-btn.active{background:#818cf822;color:var(--accent);border-color:var(--accent);}
+  .file-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;margin-bottom:10px;}
+  .file-info{flex:1;}
+  .file-name{font-weight:600;font-size:14px;}
+  .file-meta{color:var(--text3);font-size:12px;margin-top:2px;}
+  .new-task-hdr{margin-bottom:24px;}
+  .new-task-title{font-size:22px;font-weight:800;font-family:var(--mono);}
+  .step-indicator{display:flex;align-items:center;gap:6px;margin-top:14px;flex-wrap:wrap;}
+  .step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all 0.2s;border:2px solid transparent;flex-shrink:0;}
+  .step-dot.done{background:var(--green);color:#fff;}
+  .step-dot.active{background:var(--accent);color:#0f172a;border-color:var(--accent2);}
+  .step-dot.future{background:var(--surface2);color:var(--text3);}
+  .step-label{font-size:12px;color:var(--text3);}
+  .step-label.active{color:var(--text);font-weight:600;}
+  .step-sep{color:var(--border2);}
+  .step-nav{display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+  .cancel-btn{background:none;border:1px solid var(--border2);color:var(--text3);border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit;}
+  .prev-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit;}
+  .review-box{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:20px;}
+  .review-title{font-size:16px;font-weight:700;margin-bottom:14px;}
+  .review-row{display:flex;gap:10px;font-size:14px;padding:8px 0;border-bottom:1px solid var(--border2);color:var(--text2);}
+  .review-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;color:var(--text);}
+  #install-banner{background:#818cf811;border:1px solid #818cf833;border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:13px;}
+  #install-banner .close-banner{background:none;border:none;color:var(--text3);cursor:pointer;padding:0;font-size:18px;margin-left:auto;line-height:1;}
+  @media(max-width:600px){
+    .stats-row{grid-template-columns:repeat(2,1fr);}
+    .stat-value{font-size:24px;}
+    .task-name-input{font-size:20px;}
+    .task-grid{grid-template-columns:1fr;}
+    .field-row{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div style="display:flex;align-items:center;">
+      <div class="logo" onclick="goHome()" style="cursor:pointer;">⬡ TASKHUB</div>
+      <div id="breadcrumb" style="display:none;">
+        <span style="color:var(--text3);">›</span>
+        <span class="current" id="breadcrumb-name"></span>
+      </div>
+    </div>
+    <span id="saving-badge">Saving…</span>
+  </div>
+  <div id="main"></div>
+</div>
+<script>
+let tasks=[];
+let view='home';
+let activeTaskId=null;
+let currentFilter='All';
+let searchQuery='';
+let currentTab='details';
+let newDraft=null;
+let newStep=0;
+
+function loadData(){try{tasks=JSON.parse(localStorage.getItem('taskhub-tasks')||'[]');}catch{tasks=[];}}
+let saveTimer;
+function saveData(){
+  document.getElementById('saving-badge').style.display='block';
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{localStorage.setItem('taskhub-tasks',JSON.stringify(tasks));document.getElementById('saving-badge').style.display='none';},400);
+}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function fmt(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtDT(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}
+function daysUntil(iso){if(!iso)return null;return Math.ceil((new Date(iso)-new Date())/86400000);}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+const STATUS_COLORS={'Not Started':'#6b7280','In Progress':'#f59e0b','Completed':'#10b981','On Hold':'#ef4444'};
+function newTask(name=''){return{id:uid(),name,status:'Not Started',notes:'',dueDates:[],reminders:[],files:[],emails:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};}
+function getTask(id){return tasks.find(t=>t.id===id);}
+function updateTask(updated){updated.updatedAt=new Date().toISOString();tasks=tasks.map(t=>t.id===updated.id?updated:t);saveData();}
+function deleteTask(id){tasks=tasks.filter(t=>t.id!==id);saveData();goHome();}
+
+function goHome(){view='home';activeTaskId=null;document.getElementById('breadcrumb').style.display='none';render();}
+function openTask(id){view='task';activeTaskId=id;const t=getTask(id);document.getElementById('breadcrumb').style.display='flex';document.getElementById('breadcrumb-name').textContent=t?.name||'Task';render();}
+function goNew(){view='new';activeTaskId=null;document.getElementById('breadcrumb').style.display='flex';document.getElementById('breadcrumb-name').textContent='New Task';render();}
+
+function render(){
+  const main=document.getElementById('main');
+  if(view==='home')main.innerHTML=renderHome();
+  else if(view==='task')main.innerHTML=renderTaskPage(getTask(activeTaskId));
+  else if(view==='new')main.innerHTML=renderNewTask();
+}
+
+function renderHome(){
+  const statuses=['All','Not Started','In Progress','Completed','On Hold'];
+  const filtered=tasks.filter(t=>{
+    const ms=t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const mf=currentFilter==='All'||t.status===currentFilter;
+    return ms&&mf;
+  });
+  const stats={
+    total:tasks.length,
+    inProgress:tasks.filter(t=>t.status==='In Progress').length,
+    completed:tasks.filter(t=>t.status==='Completed').length,
+    overdue:tasks.filter(t=>t.dueDates.some(d=>d.date&&daysUntil(d.date)<0)&&t.status!=='Completed').length
+  };
+  const isIOS=/iphone|ipad/i.test(navigator.userAgent);
+  const isStandalone=window.navigator.standalone===true;
+  const hideBannerFlag=localStorage.getItem('taskhub-hide-banner');
+  const bannerHtml=isIOS&&!isStandalone&&!hideBannerFlag?`<div id="install-banner"><span>📲</span><span>Tap the <strong>Share</strong> button → <strong>Add to Home Screen</strong> to install TaskHub on your iPad</span><button class="close-banner" onclick="hideBanner()">✕</button></div>`:'';
+  return`<div class="page">
+    ${bannerHtml}
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" style="color:var(--accent)">${stats.total}</div><div class="stat-label">Total Tasks</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--amber)">${stats.inProgress}</div><div class="stat-label">In Progress</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--green)">${stats.completed}</div><div class="stat-label">Completed</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--red)">${stats.overdue}</div><div class="stat-label">Overdue</div></div>
+    </div>
+    <div class="controls">
+      <input class="search-input" placeholder="Search tasks…" value="${escHtml(searchQuery)}" oninput="searchQuery=this.value;render()"/>
+      <div class="filter-row">${statuses.map(s=>`<button class="filter-btn${currentFilter===s?' active':''}" onclick="currentFilter='${s}';render()">${s}</button>`).join('')}</div>
+      <button class="add-btn" onclick="goNew()">+ Task</button>
+    </div>
+    ${filtered.length===0?`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">${tasks.length===0?'No tasks yet':'No tasks match'}</div><div class="empty-sub">${tasks.length===0?'Create your first task to get started':'Try a different search or filter'}</div>${tasks.length===0?`<button class="add-btn" onclick="goNew()" style="margin:0 auto;">+ Create Task</button>`:''}</div>`:`<div class="task-grid">${filtered.map(renderTaskCard).join('')}</div>`}
+  </div>`;
+}
+
+function renderTaskCard(t){
+  const sc=STATUS_COLORS[t.status]||'#6b7280';
+  const nextDue=t.dueDates.filter(d=>d.date).sort((a,b)=>new Date(a.date)-new Date(b.date))[0];
+  const days=nextDue?daysUntil(nextDue.date):null;
+  const isOverdue=days!==null&&days<0&&t.status!=='Completed';
+  const isDueSoon=days!==null&&days>=0&&days<=7&&t.status!=='Completed';
+  let dueHtml='';
+  if(nextDue){const cls=isOverdue?'overdue':isDueSoon?'soon':'';const tag=isOverdue?`<span class="overdue-tag">OVERDUE</span>`:isDueSoon?`<span class="soon-tag">DUE SOON</span>`:'';dueHtml=`<div class="tc-due ${cls}">📅 ${escHtml(nextDue.label||'Due')}: ${fmt(nextDue.date)} ${tag}</div>`;}
+  return`<div class="task-card" onclick="openTask('${t.id}')">
+    <div class="tc-top"><div class="tc-name">${escHtml(t.name||'Untitled Task')}</div><span class="status-badge" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${t.status}</span></div>
+    ${dueHtml}
+    <div class="tc-meta"><span class="tc-meta-item">📅 ${t.dueDates.length}</span><span class="tc-meta-item">🔔 ${t.reminders.length}</span><span class="tc-meta-item">📎 ${t.files.length}</span><span class="tc-meta-item">✉️ ${t.emails.length}</span><span class="tc-date">Updated ${fmt(t.updatedAt)}</span></div>
+  </div>`;
+}
+
+function renderTaskPage(t){
+  if(!t)return'<div class="page"><p>Task not found.</p></div>';
+  const tabs=[{id:'details',label:'Details',icon:'📝'},{id:'dates',label:`Due Dates (${t.dueDates.length})`,icon:'📅'},{id:'reminders',label:`Reminders (${t.reminders.length})`,icon:'🔔'},{id:'files',label:`Files (${t.files.length})`,icon:'📎'},{id:'emails',label:`Emails (${t.emails.length})`,icon:'✉️'}];
+  return`<div class="page">
+    <div class="task-header">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="flex:1;">
+          <input class="task-name-input" id="task-name" value="${escHtml(t.name)}" placeholder="Task Name…" onblur="updateField('name',this.value)"/>
+          <div class="task-meta-row">
+            <span class="field-label" style="margin:0;">Status:</span>
+            <select class="status-select" onchange="updateField('status',this.value)">${Object.keys(STATUS_COLORS).map(s=>`<option${t.status===s?' selected':''}>${s}</option>`).join('')}</select>
+            <span style="color:var(--text3);font-size:11px;margin-left:auto;">Updated ${fmt(t.updatedAt)}</span>
+          </div>
+        </div>
+        <button class="delete-btn" onclick="confirmDelete()">🗑️</button>
+      </div>
+    </div>
+    <div id="confirm-delete" style="display:none;" class="confirm-box">
+      <span>Delete <strong>${escHtml(t.name||'this task')}</strong>? Cannot be undone.</span>
+      <button class="confirm-yes" onclick="deleteTask('${t.id}')">Delete</button>
+      <button class="confirm-no" onclick="document.getElementById('confirm-delete').style.display='none'">Cancel</button>
+    </div>
+    <div class="tabs">${tabs.map(tb=>`<button class="tab${currentTab===tb.id?' active':''}" onclick="currentTab='${tb.id}';render()">${tb.icon} ${tb.label}</button>`).join('')}</div>
+    <div class="tab-content">${renderTab(t)}</div>
+  </div>`;
+}
+
+function renderTab(t){
+  if(currentTab==='details')return`<div><label class="field-label">Notes / Description</label><textarea class="input" rows="12" placeholder="Add notes…" onblur="updateField('notes',this.value)">${escHtml(t.notes||'')}</textarea></div>`;
+  if(currentTab==='dates')return renderDates(t);
+  if(currentTab==='reminders')return renderReminders(t);
+  if(currentTab==='files')return renderFiles(t);
+  if(currentTab==='emails')return renderEmails(t);
+  return'';
+}
+
+function renderDates(t){
+  const DT=['Bid Due Date','Submittal Drawings','Production','Ship Date','Delivery','Progress Payment'];
+  return`<div>
+    <datalist id="date-types">${DT.map(d=>`<option value="${d}"/>`).join('')}</datalist>
+    <div class="section-hdr"><span>Due Dates & Milestones</span><button class="small-add-btn" onclick="addDueDate()">+ Add Date</button></div>
+    ${t.dueDates.length===0?'<div class="empty-section">No due dates yet. Tap "Add Date" to create one.</div>':''}
+    ${t.dueDates.map((d,i)=>{
+      const days=d.date?daysUntil(d.date):null;
+      const isOD=days!==null&&days<0;
+      const badge=days===null?'':(isOD?`<span class="days-badge" style="background:#ef444422;color:var(--red)">${Math.abs(days)}d overdue</span>`:days===0?`<span class="days-badge" style="background:#f59e0b22;color:var(--amber)">Due today</span>`:`<span class="days-badge" style="background:#10b98122;color:var(--green)">${days}d away</span>`);
+      return`<div class="card"><div class="card-hdr" onclick="toggleCard('dd-${d.id}')"><span>📅</span><span class="card-hdr-title">${escHtml(d.label||`Milestone ${i+1}`)}</span>${d.date?`<span class="card-hdr-sub">${fmt(d.date)}</span>`:''} ${badge}<button class="icon-btn" onclick="event.stopPropagation();removeDueDate('${d.id}')">🗑</button></div>
+      <div class="card-body" id="dd-${d.id}"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(d.label||'')}" list="date-types" placeholder="e.g. Bid Due Date…" onblur="updateDueDate('${d.id}','label',this.value)"/></div><div class="field"><label class="field-label">Date</label><input class="input" type="date" value="${d.date||''}" onchange="updateDueDate('${d.id}','date',this.value)"/></div></div>
+      <div class="field"><label class="field-label">Notes</label><input class="input" value="${escHtml(d.notes||'')}" placeholder="Optional notes…" onblur="updateDueDate('${d.id}','notes',this.value)"/></div></div></div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderReminders(t){
+  return`<div>
+    <div class="section-hdr"><span>Reminders</span><button class="small-add-btn" onclick="addReminder()">+ Add Reminder</button></div>
+    <div class="reminder-notice">🔔 <span>Set date, time, and contact info for each reminder.</span></div>
+    ${t.reminders.length===0?'<div class="empty-section">No reminders yet. Tap "Add Reminder" to create one.</div>':''}
+    ${t.reminders.map((r,i)=>`<div class="card"><div class="card-hdr" onclick="toggleCard('rm-${r.id}')"><span>🔔</span><span class="card-hdr-title">${escHtml(r.label||`Reminder ${i+1}`)}</span>${r.datetime?`<span class="card-hdr-sub">${fmtDT(r.datetime)}</span>`:''}<span class="status-badge" style="background:${r.method==='email'?'#818cf822':'#10b98122'};color:${r.method==='email'?'var(--accent)':'var(--green)'};border:1px solid ${r.method==='email'?'#818cf844':'#10b98144'}">${r.method==='email'?'📧 Email':'💬 SMS'}</span><button class="icon-btn" onclick="event.stopPropagation();removeReminder('${r.id}')">🗑</button></div>
+    <div class="card-body" id="rm-${r.id}"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(r.label||'')}" placeholder="e.g. Bid deadline reminder…" onblur="updateReminder('${r.id}','label',this.value)"/></div><div class="field"><label class="field-label">Date & Time</label><input class="input" type="datetime-local" value="${r.datetime||''}" onchange="updateReminder('${r.id}','datetime',this.value)"/></div></div>
+    <div class="field-row"><div class="field"><label class="field-label">Method</label><div class="method-btns"><button class="method-btn${r.method==='email'?' active':''}" onclick="updateReminder('${r.id}','method','email');render()">📧 EMAIL</button><button class="method-btn${r.method==='sms'?' active':''}" onclick="updateReminder('${r.id}','method','sms');render()">💬 SMS</button></div></div>
+    <div class="field"><label class="field-label">${r.method==='email'?'Email Address':'Phone Number'}</label><input class="input" value="${escHtml(r.contact||'')}" placeholder="${r.method==='email'?'you@example.com':'+1 (555) 000-0000'}" onblur="updateReminder('${r.id}','contact',this.value)"/></div></div></div></div>`).join('')}
+  </div>`;
+}
+
+function renderFiles(t){
+  return`<div>
+    <div class="section-hdr"><span>Attached Files</span><button class="small-add-btn" onclick="document.getElementById('file-input').click()">📎 Attach File</button></div>
+    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this)"/>
+    ${t.files.length===0?'<div class="empty-section">No files attached. Tap "Attach File" to add documents.</div>':''}
+    ${t.files.map(f=>`<div class="file-row"><span style="font-size:20px;">📄</span><div class="file-info"><div class="file-name">${escHtml(f.name)}</div><div class="file-meta">${(f.size/1024).toFixed(1)} KB · Added ${fmt(f.addedAt)}</div></div><button class="icon-btn" onclick="removeFile('${f.id}')">🗑</button></div>`).join('')}
+  </div>`;
+}
+
+function renderEmails(t){
+  return`<div>
+    <div class="section-hdr"><span>Saved Emails</span><button class="small-add-btn" onclick="addEmail()">+ Add Email</button></div>
+    ${t.emails.length===0?'<div class="empty-section">No emails saved. Paste important email threads here.</div>':''}
+    ${t.emails.map((e,i)=>`<div class="card"><div class="card-hdr" onclick="toggleCard('em-${e.id}')"><span>✉️</span><span class="card-hdr-title">${escHtml(e.subject||`Email ${i+1}`)}</span>${e.from?`<span class="card-hdr-sub">from ${escHtml(e.from)}</span>`:''}<button class="icon-btn" onclick="event.stopPropagation();removeEmail('${e.id}')">🗑</button></div>
+    <div class="card-body" id="em-${e.id}" style="display:none;"><div class="field-row"><div class="field"><label class="field-label">From</label><input class="input" value="${escHtml(e.from||'')}" placeholder="sender@example.com" onblur="updateEmail('${e.id}','from',this.value)"/></div><div class="field"><label class="field-label">Date</label><input class="input" type="date" value="${e.date?e.date.slice(0,10):''}" onchange="updateEmail('${e.id}','date',this.value)"/></div></div>
+    <div class="field" style="margin-bottom:12px;"><label class="field-label">Subject</label><input class="input" value="${escHtml(e.subject||'')}" placeholder="Email subject…" onblur="updateEmail('${e.id}','subject',this.value)"/></div>
+    <div class="field"><label class="field-label">Body</label><textarea class="input" rows="5" placeholder="Paste email content here…" onblur="updateEmail('${e.id}','body',this.value)">${escHtml(e.body||'')}</textarea></div></div></div>`).join('')}
+  </div>`;
+}
+
+function renderNewTask(){
+  if(!newDraft)newDraft=newTask();
+  const steps=['Task Info','Due Dates','Reminders','Review'];
+  const DT=['Bid Due Date','Submittal Drawings','Production','Ship Date','Delivery','Progress Payment'];
+  const stepHtml=steps.map((s,i)=>{const cls=i<newStep?'done':i===newStep?'active':'future';return`<div class="step-dot ${cls}">${i<newStep?'✓':i+1}</div><span class="step-label${i===newStep?' active':''}">${s}</span>${i<steps.length-1?'<span class="step-sep">›</span>':''}`;}).join('');
+  let content='';
+  if(newStep===0){content=`<div class="field" style="margin-bottom:16px;"><label class="field-label">Task Name *</label><input class="input" id="new-name" value="${escHtml(newDraft.name)}" placeholder="Enter task name…" oninput="newDraft.name=this.value" style="font-size:18px;padding:12px 14px;"/></div><div class="field" style="margin-bottom:16px;"><label class="field-label">Initial Status</label><select class="status-select" onchange="newDraft.status=this.value">${Object.keys(STATUS_COLORS).map(s=>`<option${newDraft.status===s?' selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label class="field-label">Notes</label><textarea class="input" rows="5" placeholder="Add any initial notes…" oninput="newDraft.notes=this.value">${escHtml(newDraft.notes||'')}</textarea></div>`;}
+  else if(newStep===1){content=`<datalist id="date-types">${DT.map(d=>`<option value="${d}"/>`).join('')}</datalist><div class="section-hdr"><span>Add Due Dates</span><button class="small-add-btn" onclick="newDraft.dueDates.push({id:uid(),label:'',date:'',notes:''});render()">+ Add Date</button></div><p style="color:var(--text3);font-size:13px;margin-bottom:14px;">Name each milestone whatever you need.</p>${newDraft.dueDates.length===0?'<div class="empty-section">Tap "Add Date" to add your first milestone</div>':''}${newDraft.dueDates.map((d,i)=>`<div class="card"><div class="card-hdr"><span>📅</span><span class="card-hdr-title">${escHtml(d.label||`Milestone ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.dueDates=newDraft.dueDates.filter(x=>x.id!=='${d.id}');render()">🗑</button></div><div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(d.label||'')}" list="date-types" placeholder="e.g. Bid Due Date…" oninput="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,label:this.value}:x)"/></div><div class="field"><label class="field-label">Date</label><input class="input" type="date" value="${d.date||''}" onchange="newDraft.dueDates=newDraft.dueDates.map(x=>x.id==='${d.id}'?{...x,date:this.value}:x)"/></div></div></div></div>`).join('')}`;}
+  else if(newStep===2){content=`<div class="section-hdr"><span>Set Reminders</span><button class="small-add-btn" onclick="newDraft.reminders.push({id:uid(),label:'',datetime:'',method:'email',contact:''});render()">+ Add Reminder</button></div><div class="reminder-notice">🔔 <span>Set date, time, and contact for each reminder.</span></div>${newDraft.reminders.length===0?'<div class="empty-section">Tap "Add Reminder" to create a reminder</div>':''}${newDraft.reminders.map((r,i)=>`<div class="card"><div class="card-hdr"><span>🔔</span><span class="card-hdr-title">${escHtml(r.label||`Reminder ${i+1}`)}</span><button class="icon-btn" onclick="newDraft.reminders=newDraft.reminders.filter(x=>x.id!=='${r.id}');render()">🗑</button></div><div class="card-body"><div class="field-row"><div class="field"><label class="field-label">Label</label><input class="input" value="${escHtml(r.label||'')}" placeholder="e.g. Bid reminder…" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,label:this.value}:x)"/></div><div class="field"><label class="field-label">Date & Time</label><input class="input" type="datetime-local" value="${r.datetime||''}" onchange="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,datetime:this.value}:x)"/></div></div><div class="field-row"><div class="field"><label class="field-label">Method</label><div class="method-btns"><button class="method-btn${r.method==='email'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'email'}:x);render()">📧 EMAIL</button><button class="method-btn${r.method==='sms'?' active':''}" onclick="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,method:'sms'}:x);render()">💬 SMS</button></div></div><div class="field"><label class="field-label">${r.method==='email'?'Email':'Phone'}</label><input class="input" value="${escHtml(r.contact||'')}" placeholder="${r.method==='email'?'you@example.com':'+1 (555) 000-0000'}" oninput="newDraft.reminders=newDraft.reminders.map(x=>x.id==='${r.id}'?{...x,contact:this.value}:x)"/></div></div></div></div>`).join('')}`;}
+  else{content=`<div class="review-box"><div class="review-title">📋 Task Summary</div><div class="review-row"><span>Name:</span><strong>${escHtml(newDraft.name||'—')}</strong></div><div class="review-row"><span>Status:</span><strong>${newDraft.status}</strong></div><div class="review-row"><span>Due Dates:</span><strong>${newDraft.dueDates.length} milestone${newDraft.dueDates.length!==1?'s':''}</strong></div><div class="review-row"><span>Reminders:</span><strong>${newDraft.reminders.length} reminder${newDraft.reminders.length!==1?'s':''}</strong></div>${newDraft.dueDates.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">MILESTONES</div>${newDraft.dueDates.map(d=>`<div class="review-item">📅 <strong>${escHtml(d.label||'Unnamed')}</strong> — ${d.date?fmt(d.date):'No date set'}</div>`).join('')}</div>`:''}${newDraft.reminders.length>0?`<div style="margin-top:14px;"><div class="field-label" style="margin-bottom:8px;">REMINDERS</div>${newDraft.reminders.map(r=>`<div class="review-item">🔔 <strong>${escHtml(r.label||'Unnamed')}</strong> — ${r.datetime?fmtDT(r.datetime):'No time set'} via ${r.method.toUpperCase()}</div>`).join('')}</div>`:''}  </div>`;}
+  return`<div class="page"><div class="new-task-hdr"><div class="new-task-title">Create New Task</div><div class="step-indicator">${stepHtml}</div></div><div class="tab-content">${content}</div><div class="step-nav"><button class="cancel-btn" onclick="newDraft=null;newStep=0;goHome()">Cancel</button><div style="display:flex;gap:10px;">${newStep>0?`<button class="prev-btn" onclick="newStep--;render()">← Back</button>`:''}${newStep<steps.length-1?`<button class="add-btn" onclick="if(newDraft.name.trim())newStep++;render()" ${!newDraft.name.trim()?'disabled style="opacity:0.5"':''}>Next →</button>`:`<button class="add-btn" onclick="saveNewTask()" ${!newDraft.name.trim()?'disabled style="opacity:0.5"':''}>✓ Save Task</button>`}</div></div></div>`;
+}
+
+function toggleCard(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function hideBanner(){localStorage.setItem('taskhub-hide-banner','1');document.getElementById('install-banner')?.remove();}
+function confirmDelete(){document.getElementById('confirm-delete').style.display='flex';}
+function updateField(field,value){const t=getTask(activeTaskId);if(!t)return;t[field]=value;updateTask(t);if(field==='name')document.getElementById('breadcrumb-name').textContent=value||'Task';}
+function addDueDate(){const t=getTask(activeTaskId);if(!t)return;t.dueDates.push({id:uid(),label:'',date:'',notes:''});updateTask(t);render();}
+function removeDueDate(id){const t=getTask(activeTaskId);if(!t)return;t.dueDates=t.dueDates.filter(d=>d.id!==id);updateTask(t);render();}
+function updateDueDate(id,field,value){const t=getTask(activeTaskId);if(!t)return;t.dueDates=t.dueDates.map(d=>d.id===id?{...d,[field]:value}:d);updateTask(t);}
+function addReminder(){const t=getTask(activeTaskId);if(!t)return;t.reminders.push({id:uid(),label:'',datetime:'',method:'email',contact:''});updateTask(t);render();}
+function removeReminder(id){const t=getTask(activeTaskId);if(!t)return;t.reminders=t.reminders.filter(r=>r.id!==id);updateTask(t);render();}
+function updateReminder(id,field,value){const t=getTask(activeTaskId);if(!t)return;t.reminders=t.reminders.map(r=>r.id===id?{...r,[field]:value}:r);updateTask(t);}
+function handleFiles(input){const t=getTask(activeTaskId);if(!t)return;Array.from(input.files).forEach(f=>{t.files.push({id:uid(),name:f.name,size:f.size,type:f.type,addedAt:new Date().toISOString()});});updateTask(t);render();input.value='';}
+function removeFile(id){const t=getTask(activeTaskId);if(!t)return;t.files=t.files.filter(f=>f.id!==id);updateTask(t);render();}
+function addEmail(){const t=getTask(activeTaskId);if(!t)return;t.emails.push({id:uid(),from:'',subject:'',body:'',date:new Date().toISOString()});updateTask(t);render();}
+function removeEmail(id){const t=getTask(activeTaskId);if(!t)return;t.emails=t.emails.filter(e=>e.id!==id);updateTask(t);render();}
+function updateEmail(id,field,value){const t=getTask(activeTaskId);if(!t)return;t.emails=t.emails.map(e=>e.id===id?{...e,[field]:value}:e);updateTask(t);}
+function saveNewTask(){if(!newDraft.name.trim())return;tasks.unshift({...newDraft,updatedAt:new Date().toISOString()});saveData();const id=newDraft.id;newDraft=null;newStep=0;openTask(id);}
+
+if('serviceWorker' in navigator){
+  const swCode=`const CACHE='taskhub-v1';self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./',  './index.html','./manifest.json'])).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
+  const blob=new Blob([swCode],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob),{scope:'./'}).catch(()=>{});
+}
+
+loadData();
+render();
+</script>
+</body>
+</html>
